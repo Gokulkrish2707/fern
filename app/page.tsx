@@ -126,7 +126,7 @@ export default function Home() {
   const [userId, setUserId] = useState<string | null>(null)
   const [myUsername, setMyUsername] = useState('there')
   const [partnerName, setPartnerName] = useState('')
-  const [daysTogther, setDaysTogether] = useState<number | null>(null)
+  const [daysTogether, setDaysTogether] = useState<number | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTask, setNewTask] = useState('')
   const [activeMode, setActiveMode] = useState<Mode | null>(null)
