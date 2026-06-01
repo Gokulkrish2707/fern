@@ -23,9 +23,9 @@ const MODES: { key: Mode; label: string; emoji: string; desc: string; color: str
 
 const BEAR_MESSAGES: Record<Mode | 'default', string> = {
   default: 'What vibe are we feeling today? ~ᵕᴗᵕ~',
-  focus:   "Let's get things done! I believe in you 🌱",
+  focus:   "Let&apos;s get things done! I believe in you 🌱",
   cozy:    'Mmm cozy time. Want some tea? ☕',
-  play:    "Yay! Let's have fun together! 🎮",
+  play:    "Yay! Let&apos;s have fun together! 🎮",
   sleepy:  "Shh let's wind down slowly 🌙",
 }
 
@@ -249,10 +249,6 @@ if (membership) {
   }
 
   async function handleToggleTask(id: string, completed: boolean) {
-    async function handleDeleteTask(id: string) {
-  setTasks(prev => prev.filter(t => t.id !== id))
-  await supabase.from('tasks').delete().eq('id', id)
-}
     setTasks(prev => prev.map(t => t.id === id ? { ...t, completed } : t))
     const { error } = await supabase.from('tasks').update({ completed }).eq('id', id)
     if (error) {
@@ -260,6 +256,10 @@ if (membership) {
       setTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !completed } : t))
     }
   }
+  async function handleDeleteTask(id: string) {
+  setTasks(prev => prev.filter(t => t.id !== id))
+  await supabase.from('tasks').delete().eq('id', id)
+}
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -333,7 +333,7 @@ if (membership) {
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex justify-between items-center mb-1">
               <h2 className="font-semibold text-[#4a3728] flex items-center gap-1.5">
-                <span>🌱</span> Today's Tasks
+                <span>🌱</span> Today&apos;s Tasks
               </h2>
               <span className="text-xs text-[#9a8878]">
                 {loading ? '...' : `${completedCount}/${tasks.length} done`}
@@ -395,7 +395,7 @@ if (membership) {
         <div className="px-4 mt-4">
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <h2 className="font-semibold text-[#4a3728] flex items-center gap-1.5 mb-3">
-              <span>🌿</span> Bear's Status
+              <span>🌿</span> Bear&apos;s Status
             </h2>
             <div className="flex gap-3 items-start">
               <div className="w-16 h-16 bg-[#f5e6d3] rounded-2xl flex items-center justify-center text-3xl flex-shrink-0">🐻</div>
