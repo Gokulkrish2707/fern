@@ -124,22 +124,34 @@ function TaskItem({ task, onToggle }: {
 export default function Home() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
+  const [myUsername, setMyUsername] = useState('there')
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTask, setNewTask] = useState('')
   const [activeMode, setActiveMode] = useState<Mode | null>(null)
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
 
+  // Auth check + load username
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) {
         router.push('/login')
-      } else {
-        setUserId(data.session.user.id)
+        return
       }
+      const uid = data.session.user.id
+      setUserId(uid)
+
+      // Load username from profiles
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', uid)
+        .single()
+      if (profile) setMyUsername(profile.username)
     })
   }, [router])
 
+  // Fetch tasks + realtime
   useEffect(() => {
     if (!userId) return
 
@@ -159,14 +171,11 @@ export default function Home() {
 
     fetchTasks()
 
-    // Realtime listener
     const channel = supabase
       .channel('tasks-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks' },
-        () => { fetchTasks() }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        fetchTasks()
+      })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
@@ -228,7 +237,7 @@ export default function Home() {
           </div>
 
           <div className="px-5 pt-1">
-            <h1 className="text-2xl font-bold text-[#3d2b1f]">Good morning, Nira! ☀️</h1>
+            <h1 className="text-2xl font-bold text-[#3d2b1f]">Good morning, {myUsername}! ☀️</h1>
             <p className="text-[#7a6652] text-sm mt-0.5">I slept so well!</p>
             <p className="text-[#7a6652] text-sm">What shall we do today?</p>
           </div>
@@ -310,14 +319,14 @@ export default function Home() {
             <div className="flex justify-between items-center mb-2">
               <h2 className="font-semibold text-[#4a3728] flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-[#e07070] inline-block" />
-                From Aarav
+                From partner
               </h2>
               <span className="text-xs text-[#b0a090]">2m ago</span>
             </div>
             <div className="flex gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#c8d8f0] flex items-center justify-center flex-shrink-0">👦</div>
+              <div className="w-8 h-8 rounded-full bg-[#c8d8f0] flex items-center justify-center flex-shrink-0">🐻</div>
               <div className="bg-[#f5f0e8] rounded-xl rounded-tl-sm p-2.5 text-sm text-[#4a3728] flex-1">
-                Good luck on your test today! You have got this 🐻💕
+                Good luck today! You have got this 🐻💕
               </div>
             </div>
             <p className="text-right text-xs text-[#7a9e6e] mt-2 cursor-pointer">Tap to view and reply →</p>

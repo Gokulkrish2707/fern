@@ -9,6 +9,7 @@ export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -17,9 +18,14 @@ export default function LoginPage() {
   async function handleSubmit() {
     const trimmedEmail = email.trim()
     const trimmedPassword = password.trim()
+    const trimmedUsername = username.trim()
 
     if (!trimmedEmail || !trimmedPassword) {
-      setError('Please fill in both fields 🌸')
+      setError('Please fill in all fields 🌸')
+      return
+    }
+    if (isSignUp && !trimmedUsername) {
+      setError('Please enter a username 🌸')
       return
     }
 
@@ -28,25 +34,39 @@ export default function LoginPage() {
     setSuccess('')
 
     if (isSignUp) {
-      // Sign up
-      const { error } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: trimmedEmail,
         password: trimmedPassword,
       })
-      if (error) {
-        setError(error.message)
-      } else {
-        setSuccess('Account created! You can now log in 🌿')
-        setIsSignUp(false)
+      if (signUpError) {
+        setError(signUpError.message)
+        setLoading(false)
+        return
       }
+      if (data.user) {
+        await supabase.from('profiles').insert({
+          id: data.user.id,
+          username: trimmedUsername,
+        })
+        setSuccess('Account created! Logging you in 🌿')
+        // Auto login after signup
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email: trimmedEmail,
+          password: trimmedPassword,
+        })
+        if (!loginError) {
+          router.push('/')
+          return
+        }
+      }
+      setIsSignUp(false)
     } else {
-      // Log in
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error: loginError } = await supabase.auth.signInWithPassword({
         email: trimmedEmail,
         password: trimmedPassword,
       })
-      if (error) {
-        setError(error.message)
+      if (loginError) {
+        setError(loginError.message)
       } else {
         router.push('/')
       }
@@ -101,6 +121,20 @@ export default function LoginPage() {
         {/* Card */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
 
+          {/* Username - only on signup */}
+          {isSignUp && (
+            <div className="mb-3">
+              <label className="text-xs font-medium text-[#7a6652] mb-1 block">Your name</label>
+              <input
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder="e.g. Nira"
+                className="w-full text-sm bg-[#faf6f0] rounded-xl px-3 py-2.5 outline-none border border-[#e8dfd4] focus:border-[#7a9e6e] text-[#4a3728] placeholder:text-[#c8b8a2] transition-colors"
+              />
+            </div>
+          )}
+
           {/* Email */}
           <div className="mb-3">
             <label className="text-xs font-medium text-[#7a6652] mb-1 block">Email</label>
@@ -129,25 +163,17 @@ export default function LoginPage() {
 
           {/* Error / Success */}
           {error && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-xs text-[#e07070] mb-3 text-center"
-            >
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-[#e07070] mb-3 text-center">
               {error}
             </motion.p>
           )}
           {success && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-xs text-[#7a9e6e] mb-3 text-center"
-            >
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-[#7a9e6e] mb-3 text-center">
               {success}
             </motion.p>
           )}
 
-          {/* Submit button */}
+          {/* Submit */}
           <motion.button
             whileTap={{ scale: 0.96 }}
             onClick={handleSubmit}
@@ -157,14 +183,13 @@ export default function LoginPage() {
             {loading ? '…' : isSignUp ? 'Create Account 🌱' : 'Log In 🐻'}
           </motion.button>
 
-          {/* Toggle sign up / log in */}
+          {/* Toggle */}
           <button
             onClick={() => { setIsSignUp(!isSignUp); setError(''); setSuccess('') }}
             className="w-full text-center text-xs text-[#9a8878] mt-3 hover:text-[#7a9e6e] transition-colors"
           >
             {isSignUp ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
           </button>
-
         </div>
       </div>
     </main>
