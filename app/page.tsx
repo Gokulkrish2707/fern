@@ -125,6 +125,8 @@ export default function Home() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
   const [myUsername, setMyUsername] = useState('there')
+  const [partnerName, setPartnerName] = useState('')
+  const [daysTogther, setDaysTogether] = useState<number | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTask, setNewTask] = useState('')
   const [activeMode, setActiveMode] = useState<Mode | null>(null)
@@ -157,6 +159,37 @@ export default function Home() {
         .eq('id', uid)
         .single()
       if (profile) setMyUsername(profile.username)
+        // Load partner info
+      const { data: membership } = await supabase
+      .from('room_members')
+      .select('room_id, joined_at')
+      .eq('user_id', uid)
+      .single()
+
+if (membership) {
+  // Get partner
+  const { data: partner } = await supabase
+    .from('room_members')
+    .select('user_id, joined_at')
+    .eq('room_id', membership.room_id)
+    .neq('user_id', uid)
+    .single()
+
+  if (partner) {
+    const { data: partnerProfile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', partner.user_id)
+      .single()
+
+    if (partnerProfile) setPartnerName(partnerProfile.username)
+
+    const joined = new Date(membership.joined_at)
+    const now = new Date()
+    const days = Math.floor((now.getTime() - joined.getTime()) / (1000 * 60 * 60 * 24))
+    setDaysTogether(days)
+  }
+}
     })
   }, [router])
 
@@ -257,8 +290,12 @@ export default function Home() {
             <motion.div whileHover={{ scale: 1.02 }} className="bg-white/80 backdrop-blur-sm rounded-2xl px-3 py-2 flex items-center gap-2 shadow-sm">
               <div className="w-8 h-8 rounded-full bg-[#f5c0a0] flex items-center justify-center text-sm">🐻</div>
               <div>
-                <p className="text-xs font-semibold text-[#4a3728]">With Aarav</p>
-                <p className="text-xs text-[#e07070]">♥ 128 days</p>
+                <p className="text-xs font-semibold text-[#4a3728]">
+                   {partnerName ? `With ${partnerName}` : 'No partner yet'}
+                   </p>
+                   <p className="text-xs text-[#e07070]">
+                    {daysTogether !== null ? `♥ ${daysTogether} days` : '♥ connect a partner'}
+                    </p>
               </div>
             </motion.div>
             <div className="relative">
