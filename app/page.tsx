@@ -92,9 +92,10 @@ function ModeCard({ mode, active, onClick }: {
   )
 }
 
-function TaskItem({ task, onToggle }: {
+function TaskItem({ task, onToggle, onDelete }: {
   task: Task
   onToggle: (id: string, completed: boolean) => void
+  onDelete: (id: string) => void
 }) {
   return (
     <motion.div
@@ -102,7 +103,7 @@ function TaskItem({ task, onToggle }: {
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 10 }}
-      className="flex items-center gap-3 py-2"
+      className="flex items-center gap-3 py-2 group"
     >
       <button
         onClick={() => onToggle(task.id, !task.completed)}
@@ -117,6 +118,12 @@ function TaskItem({ task, onToggle }: {
       <span className={`text-sm flex-1 ${task.completed ? 'line-through text-[#b0a090]' : 'text-[#4a3728]'}`}>
         {task.title}
       </span>
+      <button
+        onClick={() => onDelete(task.id)}
+        className="opacity-0 group-hover:opacity-100 text-[#c8b8a2] hover:text-[#e07070] text-xs transition-all px-1"
+      >
+        ✕
+      </button>
     </motion.div>
   )
 }
@@ -242,6 +249,10 @@ if (membership) {
   }
 
   async function handleToggleTask(id: string, completed: boolean) {
+    async function handleDeleteTask(id: string) {
+  setTasks(prev => prev.filter(t => t.id !== id))
+  await supabase.from('tasks').delete().eq('id', id)
+}
     setTasks(prev => prev.map(t => t.id === id ? { ...t, completed } : t))
     const { error } = await supabase.from('tasks').update({ completed }).eq('id', id)
     if (error) {
@@ -336,7 +347,7 @@ if (membership) {
               ) : (
                 <AnimatePresence>
                   {tasks.map(task => (
-                    <TaskItem key={task.id} task={task} onToggle={handleToggleTask} />
+                    <TaskItem key={task.id} task={task} onToggle={handleToggleTask} onDelete={handleDeleteTask} />
                   ))}
                 </AnimatePresence>
               )}
