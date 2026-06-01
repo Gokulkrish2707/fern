@@ -45,12 +45,25 @@ export default function RoomPage() {
   }, [router])
 
   async function loadMembers(roomId: string) {
-    const { data } = await supabase
-      .from('room_members')
-      .select('user_id, joined_at, profiles(username)')
-      .eq('room_id', roomId)
-    if (data) setMembers(data as unknown as RoomMember[])
-  }
+  const { data: memberData } = await supabase
+    .from('room_members')
+    .select('user_id, joined_at')
+    .eq('room_id', roomId)
+
+  if (!memberData) return
+
+  const membersWithProfiles = await Promise.all(
+    memberData.map(async (m) => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', m.user_id)
+        .single()
+      return { ...m, profiles: profile ?? { username: 'Unknown' } }
+    })
+  )
+  setMembers(membersWithProfiles)
+}
 
   function generateCode() {
     return Math.random().toString(36).substring(2, 8).toUpperCase()
