@@ -5,28 +5,30 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 
+type RoomMember = {
+  user_id: string
+  joined_at: string
+  profiles: { username: string }
+}
+
 export default function RoomPage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
-  const [roomCode, setRoomCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [currentRoom, setCurrentRoom] = useState<{ id: string; code: string } | null>(null)
+  const [members, setMembers] = useState<RoomMember[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
 
-  // Auth check + load existing room
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
-      if (!data.session) {
-        router.push('/login')
-        return
-      }
+      if (!data.session) { router.push('/login'); return }
       const uid = data.session.user.id
       setUserId(uid)
 
-      // Check if already in a room
       const { data: membership } = await supabase
         .from('room_members')
         .select('room_id, rooms(id, code)')
@@ -36,77 +38,74 @@ export default function RoomPage() {
       if (membership?.rooms) {
         const room = membership.rooms as unknown as { id: string; code: string }
         setCurrentRoom(room)
+        await loadMembers(room.id)
       }
       setLoading(false)
     })
   }, [router])
 
-  // Generate random 6-char code
+  async function loadMembers(roomId: string) {
+    const { data } = await supabase
+      .from('room_members')
+      .select('user_id, joined_at, profiles(username)')
+      .eq('room_id', roomId)
+    if (data) setMembers(data as unknown as RoomMember[])
+  }
+
   function generateCode() {
     return Math.random().toString(36).substring(2, 8).toUpperCase()
   }
 
-  // Create a new room
   async function handleCreateRoom() {
     if (!userId || creating) return
     setCreating(true)
     setError('')
-
     const code = generateCode()
-
     const { data: room, error: roomErr } = await supabase
       .from('rooms')
       .insert({ code, created_by: userId })
       .select()
       .single()
-
-    if (roomErr) {
-      setError('Could not create room. Try again!')
-      setCreating(false)
-      return
-    }
-
+    if (roomErr) { setError('Could not create room. Try again!'); setCreating(false); return }
     await supabase.from('room_members').insert({ room_id: room.id, user_id: userId })
     setCurrentRoom(room)
+    await loadMembers(room.id)
     setCreating(false)
   }
 
-  // Join an existing room
   async function handleJoinRoom() {
     if (!userId || joining || !joinCode.trim()) return
     setJoining(true)
     setError('')
-
     const { data: room, error: roomErr } = await supabase
       .from('rooms')
       .select('*')
       .eq('code', joinCode.trim().toUpperCase())
       .single()
-
-    if (roomErr || !room) {
-      setError('Room not found! Check the code and try again 🌸')
-      setJoining(false)
-      return
-    }
-
-    await supabase
-      .from('room_members')
-      .upsert({ room_id: room.id, user_id: userId }, { onConflict: 'room_id,user_id' })
-
+    if (roomErr || !room) { setError('Room not found! Check the code 🌸'); setJoining(false); return }
+    await supabase.from('room_members').upsert({ room_id: room.id, user_id: userId }, { onConflict: 'room_id,user_id' })
     setCurrentRoom(room)
+    await loadMembers(room.id)
     setJoining(false)
   }
 
-  // Leave room
   async function handleLeaveRoom() {
     if (!userId || !currentRoom) return
-    await supabase
-      .from('room_members')
-      .delete()
-      .eq('room_id', currentRoom.id)
-      .eq('user_id', userId)
+    await supabase.from('room_members').delete().eq('room_id', currentRoom.id).eq('user_id', userId)
     setCurrentRoom(null)
+    setMembers([])
   }
+
+  async function handleCopy() {
+    if (!currentRoom) return
+    await navigator.clipboard.writeText(currentRoom.code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const partner = members.find(m => m.user_id !== userId)
+  const me = members.find(m => m.user_id === userId)
+  const daysConnected = me ? Math.floor((new Date().getTime() - new Date(me.joined_at).getTime()) / (1000 * 60 * 60 * 24)) : 0
 
   if (loading) {
     return (
@@ -120,7 +119,6 @@ export default function RoomPage() {
     <main className="min-h-screen bg-[#faf6f0] flex justify-center px-4 py-8">
       <div className="w-full max-w-sm">
 
-        {/* Back button */}
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => router.push('/')}
@@ -129,7 +127,6 @@ export default function RoomPage() {
           ← Back to home
         </motion.button>
 
-        {/* Bear */}
         <motion.div
           className="flex justify-center mb-5"
           animate={{ y: [0, -5, 0] }}
@@ -153,34 +150,81 @@ export default function RoomPage() {
             <ellipse cx="65" cy="118" rx="36" ry="28" fill="#c49070" />
             <path d="M 38 96 Q 65 108 92 96 L 88 108 Q 65 120 42 108 Z" fill="#7a9e6e" opacity="0.9" />
             <circle cx="65" cy="105" r="4" fill="#5a7e50" />
-            <ellipse cx="26" cy="112" rx="12" ry="20" fill="#c49070" transform="rotate(-15 26 112)" />
-            <ellipse cx="104" cy="112" rx="12" ry="20" fill="#c49070" transform="rotate(15 104 112)" />
           </svg>
         </motion.div>
 
         <h1 className="text-xl font-bold text-[#3d2b1f] text-center mb-1">Partner Room 🌿</h1>
-        <p className="text-sm text-[#9a8878] text-center mb-6">Connect with someone special ♥</p>
+        <p className="text-sm text-[#9a8878] text-center mb-6">Your cozy shared space ♥</p>
 
         {currentRoom ? (
-          /* ── Already in a room ── */
           <div className="space-y-4">
-            <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
-              <p className="text-xs text-[#9a8878] mb-2">Your room code</p>
-              <div className="text-4xl font-bold text-[#7a9e6e] tracking-widest mb-3">
-                {currentRoom.code}
+
+            {/* Connection status */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-2 h-2 rounded-full ${partner ? 'bg-[#7a9e6e]' : 'bg-[#e8c44a]'}`} />
+                <span className="text-xs font-medium text-[#7a6652]">
+                  {partner ? 'Connected 🌿' : 'Waiting for partner…'}
+                </span>
               </div>
-              <p className="text-xs text-[#b0a090] mb-4">Share this code with your partner 🐻</p>
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={() => navigator.clipboard.writeText(currentRoom.code)}
-                className="w-full bg-[#7a9e6e] text-white rounded-xl py-2.5 text-sm font-semibold"
-              >
-                Copy Code 📋
-              </motion.button>
+
+              {/* Members */}
+              <div className="flex gap-3 justify-center">
+                {members.map(member => (
+                  <motion.div
+                    key={member.user_id}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center gap-1.5"
+                  >
+                    <div className="w-14 h-14 bg-[#f5e6d3] rounded-2xl flex items-center justify-center text-2xl border-2 border-[#e8d5c0]">
+                      {member.user_id === userId ? '🐻' : '🌸'}
+                    </div>
+                    <span className="text-xs font-medium text-[#4a3728]">
+                      {member.profiles?.username ?? 'Unknown'}
+                    </span>
+                    <span className="text-xs text-[#9a8878]">
+                      {member.user_id === userId ? 'You' : 'Partner'}
+                    </span>
+                  </motion.div>
+                ))}
+
+                {/* Empty partner slot */}
+                {!partner && (
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div className="w-14 h-14 bg-[#f5f0e8] rounded-2xl flex items-center justify-center text-2xl border-2 border-dashed border-[#d8cfc4]">
+                      🌸
+                    </div>
+                    <span className="text-xs text-[#b0a090]">Waiting…</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Days together */}
+              {partner && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mt-3 text-center bg-[#faf6f0] rounded-xl py-2"
+                >
+                  <p className="text-xs text-[#e07070] font-medium">♥ {daysConnected} days together</p>
+                </motion.div>
+              )}
             </div>
 
-            <div className="bg-[#f5f0e8] rounded-2xl p-4 text-center">
-              <p className="text-xs text-[#9a8878]">Once your partner joins, go back home and your tasks will be shared! 🌸</p>
+            {/* Room code */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm text-center">
+              <p className="text-xs text-[#9a8878] mb-1">Room code</p>
+              <div className="text-3xl font-bold text-[#7a9e6e] tracking-widest mb-3">
+                {currentRoom.code}
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleCopy}
+                className="w-full bg-[#7a9e6e] text-white rounded-xl py-2.5 text-sm font-semibold"
+              >
+                {copied ? 'Copied! ✓' : 'Copy Code 📋'}
+              </motion.button>
             </div>
 
             <motion.button
@@ -192,10 +236,7 @@ export default function RoomPage() {
             </motion.button>
           </div>
         ) : (
-          /* ── No room yet ── */
           <div className="space-y-4">
-
-            {/* Create room */}
             <div className="bg-white rounded-2xl p-4 shadow-sm">
               <h2 className="font-semibold text-[#4a3728] text-sm mb-1">Create a room</h2>
               <p className="text-xs text-[#9a8878] mb-3">Start a new space and invite your partner</p>
@@ -209,14 +250,12 @@ export default function RoomPage() {
               </motion.button>
             </div>
 
-            {/* Divider */}
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-[#e8dfd4]" />
               <span className="text-xs text-[#b0a090]">or</span>
               <div className="flex-1 h-px bg-[#e8dfd4]" />
             </div>
 
-            {/* Join room */}
             <div className="bg-white rounded-2xl p-4 shadow-sm">
               <h2 className="font-semibold text-[#4a3728] text-sm mb-1">Join a room</h2>
               <p className="text-xs text-[#9a8878] mb-3">Enter the code your partner shared</p>
@@ -240,11 +279,7 @@ export default function RoomPage() {
             </div>
 
             {error && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-xs text-[#e07070] text-center"
-              >
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs text-[#e07070] text-center">
                 {error}
               </motion.p>
             )}
