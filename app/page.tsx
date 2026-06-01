@@ -130,8 +130,17 @@ export default function Home() {
   const [activeMode, setActiveMode] = useState<Mode | null>(null)
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
+  const [currentTime, setCurrentTime] = useState('')
 
   // Auth check + load username
+  useEffect(() => {
+  function updateTime() {
+    setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+  }
+  updateTime()
+  const timer = setInterval(updateTime, 1000)
+  return () => clearInterval(timer)
+}, [])
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) {
@@ -229,7 +238,7 @@ export default function Home() {
           <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-[#a0714f]/10 blur-3xl" />
 
           <div className="flex justify-between items-center px-5 pt-4 pb-2">
-            <span className="text-[#5a4535] font-semibold text-sm">9:41</span>
+            <span className="text-[#5a4535] font-semibold text-sm">{currentTime}</span>
             <div className="flex gap-2">
               <motion.button whileTap={{ scale: 0.9 }} className="w-9 h-9 bg-white/70 rounded-xl flex items-center justify-center text-lg shadow-sm">🔔</motion.button>
               <motion.button whileTap={{ scale: 0.9 }} onClick={handleSignOut} className="w-9 h-9 bg-white/70 rounded-xl flex items-center justify-center text-lg shadow-sm" title="Sign out">👥</motion.button>
