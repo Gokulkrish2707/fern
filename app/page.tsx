@@ -246,7 +246,9 @@ export default function Home() {
           </div>
 
           <div className="px-5 pt-1">
-            <h1 className="text-2xl font-bold text-[#3d2b1f]">Good morning, {myUsername}! ☀️</h1>
+            <h1 className="text-2xl font-bold text-[#3d2b1f]">
+               {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}, {myUsername}! {new Date().getHours() < 12 ? '☀️' : new Date().getHours() < 17 ? '🌤️' : '🌙'}
+            </h1>
             <p className="text-[#7a6652] text-sm mt-0.5">I slept so well!</p>
             <p className="text-[#7a6652] text-sm">What shall we do today?</p>
           </div>
